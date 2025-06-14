@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React, { useState } from "react";
 import { FaUser, FaEye, FaEyeSlash } from "react-icons/fa";
 import { motion } from "framer-motion";
@@ -71,7 +72,7 @@ function Login() {
                   type="email"
                   required
                   placeholder="Enter Mobile Number"
-                  className="flex-grow py-2 px-3 text-gray-900 rounded-lg focus:outline-none  text-lg"
+                  className="text-gray-900 rounded-lg focus:outline-none text-lg"
                 />
                 <FaUser className="text-blue-500 ml-3" size={24} />
               </div>
@@ -90,7 +91,7 @@ function Login() {
                   type={eye ? "text" : "password"}
                   required
                   placeholder="Enter Password"
-                  className="flex-grow py-2 px-3 text-gray-900 rounded-lg focus:outline-none  text-lg"
+                  className="text-gray-900 rounded-lg focus:outline-none text-lg"
                 />
                 <button
                   type="button"

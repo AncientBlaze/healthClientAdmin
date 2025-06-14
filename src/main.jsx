@@ -20,7 +20,7 @@ import CustomerSignUp from "./components/CustomerSignUp.jsx";
 import Plans from "./components/Plans.jsx";
 import TestList from "./components/TestList.jsx";
 import ErrorPage from "./components/ErrorPage.jsx";
-
+import Logs from "./logs/Logs.jsx";
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <Router>
@@ -40,6 +40,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <Route path="/pro/:id" element={<ProfileCustomer />} />
       <Route path="/forgotPassword" element={<ForgotPassword />} />
       <Route path="/updateProfile/:id" element={<UpdateProfile />} />
+      <Route path="/logs" element={<Logs />} />
     </Routes>
   </Router>
 )

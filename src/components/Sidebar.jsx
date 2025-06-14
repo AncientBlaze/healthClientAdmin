@@ -44,8 +44,7 @@ export default function Sidebar() {
             </nav>
             <div className="flex items-center justify-center border-t border-blue-800 p-6">
                 <Link
-                    to="/"
-                    onClick={() => navigate("/login")}
+                    to="/login"
                     className="flex items-center px-6 py-3 rounded-lg hover:bg-blue-800 transition-colors group"
                 >
                     <span className="text-2xl mr-4 group-hover:scale-110 transition-transform">
