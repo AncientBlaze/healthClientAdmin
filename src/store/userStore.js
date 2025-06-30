@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import toast, { Toaster } from 'react-hot-toast';
-import axios from "../utils/axios";
+import axios from "../utils/axios.js";
 
 const useUserStore = create((set, get) => ({
     user: null,

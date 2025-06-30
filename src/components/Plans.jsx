@@ -21,6 +21,7 @@ function Plans() {
         setCustomers(data.data);
         setFilteredCustomers(data.data);
       } catch (error) {
+        console.error(error);
         toast.error("Failed to fetch customers.");
       }
     };

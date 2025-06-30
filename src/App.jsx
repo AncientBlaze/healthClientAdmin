@@ -1,12 +1,9 @@
-import Register from './components/Register';
-
-function App() {
+const App = () => {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white">
-      <Register />
+    <div>
+      <h1>App</h1>
     </div>
   );
-}
+};
 
 export default App;
-
