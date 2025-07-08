@@ -71,7 +71,7 @@ function Login() {
                   id="email"
                   type="email"
                   required
-                  placeholder="Enter Mobile Number"
+                  placeholder="Enter Email"
                   className="text-gray-900 rounded-lg focus:outline-none text-lg"
                 />
                 <FaUser className="text-blue-500 ml-3" size={24} />

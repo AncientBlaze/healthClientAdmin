@@ -1,59 +1,191 @@
-import { useState, useRef } from 'react';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
-import { v4 as uuidv4 } from 'uuid';
-import Sidebar from './Sidebar';
+import React, { useState, useRef, useEffect } from "react";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import { v4 as uuidv4 } from "uuid";
+import Sidebar from "./Sidebar";
+import api from "../utils/axios";
 
 const InvoiceGenerator = () => {
+  const [tests, setTests] = useState([]);
+  const [doctors, setDoctors] = useState([]);
+  const [loadingTests, setLoadingTests] = useState(true);
+  const [searchResults, setSearchResults] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [searchUserId, setSearchUserId] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+  const [user, setUser] = useState([]);
   const [patientInfo, setPatientInfo] = useState({
-    name: '',
-    age: '',
-    gender: 'male',
-    contact: '',
-    address: '',
-    date: new Date().toISOString().split('T')[0],
-    doctor: '',
-    diagnosis: ''
+    name: "",
+    age: "",
+    gender: "male",
+    contact: "",
+    address: "",
+    date: new Date().toISOString().split("T")[0],
+    doctor: "",
+    diagnosis: "",
   });
 
+  // Prescription and billing state
   const [prescriptions, setPrescriptions] = useState([
+    {
+      id: uuidv4(),
+      testId: "",
+      Test: "",
+      Doctor: "",
+      duration: "",
+      notes: "",
+      price: "",
+      quantity: 1,
+    },
   ]);
-
-  const [invoiceNumber, setInvoiceNumber] = useState(`INV-${Math.floor(1000 + Math.random() * 9000)}`);
+  const [invoiceNumber, setInvoiceNumber] = useState(
+    `INV-${Math.floor(1000 + Math.random() * 9000)}`
+  );
   const [taxRate, setTaxRate] = useState(5);
   const [discount, setDiscount] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState('cash');
-
+  const [paymentMethod, setPaymentMethod] = useState("cash");
   const invoiceRef = useRef();
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch doctors
+        const doctorsRes = await api.get("/api/doctors/getAllDoctors");
+        setDoctors(doctorsRes.data.data);
+
+        // Fetch tests
+        const testsRes = await api.get("/api/tests/getAllTests");
+        setTests(testsRes.data.data);
+
+        setLoadingTests(false);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        setLoadingTests(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const handleSelectUser = (user) => {
+    setUser(user);
+    setSelectedUserId(user._id);
+    setSearchResults([]);
+
+    setPatientInfo({
+      ...patientInfo,
+      name: user.name || "",
+      age: user.age || "",
+      gender: user.gender || "male",
+      contact: user.phone || "",
+    });
+  };
+
+  const isId = (value) => /^[0-9a-fA-F]{24}$/.test(value); // Simple MongoDB ObjectID check
+
+const searchUser = async (e) => {
+  e.preventDefault();
+  if (!searchUserId.trim()) return;
+
+  setSearchLoading(true);
+  setSearchError(null);
+  setSearchResults([]);
+  setUser(null);
+
+  try {
+    if (isId(searchUserId)) {
+      const response = await api.post(`/api/users/getUserByID/${searchUserId}`);
+      const data = response.data.user;
+      if (data) {
+        handleSelectUser(data);
+      } else {
+        setSearchError("No user found with this ID");
+      }
+    } else {
+      const response = await api.get(`/api/users/searchByName/${searchUserId}`);
+      const data = response.data.users;
+      if (data.length === 1) {
+        handleSelectUser(data[0]);
+      } else if (data.length > 1) {
+        setSearchResults(data);
+      } else {
+        setSearchError("No users found with that name");
+      }
+    }
+  } catch (err) {
+    setSearchError(err.message || "Error fetching user");
+  } finally {
+    setSearchLoading(false);
+  }
+};
+
+
+  // Form handlers
   const handlePatientInfoChange = (e) => {
     const { name, value } = e.target;
-    setPatientInfo(prev => ({ ...prev, [name]: value }));
+    setPatientInfo((prev) => ({ ...prev, [name]: value }));
   };
 
   const handlePrescriptionChange = (id, e) => {
     const { name, value } = e.target;
-    setPrescriptions(prev =>
-      prev.map(item =>
-        item.id === id ? { ...item, [name]: value } : item
-      )
+    setPrescriptions((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, [name]: value } : item))
+    );
+  };
+
+  const handleTestChange = (id, testId) => {
+    const selectedTest = tests.find((test) => test._id === testId);
+
+    if (selectedTest) {
+      setPrescriptions((prev) =>
+        prev.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                testId: testId,
+                Test: selectedTest.name,
+                price: selectedTest.price,
+                Doctor: selectedTest.doctor || "",
+              }
+            : item
+        )
+      );
+    }
+  };
+
+  const handleDoctorChange = (id, value) => {
+    setPrescriptions((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, Doctor: value } : item))
     );
   };
 
   const addPrescription = () => {
-    setPrescriptions(prev => [
+    setPrescriptions((prev) => [
       ...prev,
-      { id: uuidv4(), Test: '', Doctor: '', duration: '', notes: '' }
+      {
+        id: uuidv4(),
+        testId: "",
+        Test: "",
+        Doctor: "",
+        duration: "",
+        notes: "",
+        price: "",
+        quantity: 1,
+      },
     ]);
   };
 
   const removePrescription = (id) => {
-    setPrescriptions(prev => prev.filter(item => item.id !== id));
+    setPrescriptions((prev) => prev.filter((item) => item.id !== id));
   };
 
+  // Calculation functions
   const calculateSubtotal = () => {
     return prescriptions.reduce((sum, item) => {
-      return sum + (parseFloat(item.price) || 0) * (parseInt(item.quantity) || 0);
+      return (
+        sum + (parseFloat(item.price) || 0) * (parseInt(item.quantity) || 0)
+      );
     }, 0);
   };
 
@@ -62,141 +194,108 @@ const InvoiceGenerator = () => {
   };
 
   const calculateTotal = () => {
-    return calculateSubtotal() + calculateTax() - discount;
+    const total = calculateSubtotal() + calculateTax() - discount;
+    return total.toFixed(2);
   };
 
+  const handlePrint = async () => {
+    const element = invoiceRef.current;
+    if (!element) return;
 
+    try {
+      const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pdfWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight;
+
+      while (heightLeft > 0) {
+        position -= pdfHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      pdf.save(`${invoiceNumber}.pdf`);
+    } catch (error) {
+      console.error("Failed to generate PDF:", error);
+    }
+  };
+
+  // Preview component
   const PreviewForm = () => {
     return (
       <div
         ref={invoiceRef}
-        style={{
-          backgroundColor: "white",
-          padding: 32,
-          border: "1px solid #e5e7eb",
-        }}
+        className="bg-[#fff] p-8 border border-[#e5e7eb] rounded-lg shadow-sm"
       >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 32,
-          }}
-        >
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <h1
-              style={{
-                fontSize: 24,
-                fontWeight: "bold",
-                color: "#1e40af",
-                textTransform: "uppercase",
-              }}
-            >
+            <h1 className="text-2xl font-bold text-[#1447e6] uppercase">
               Health Insurance
             </h1>
-            <p style={{ color: "#4b5563" }}>123 Health Street, Medical City</p>
-            <p style={{ color: "#4b5563" }}>
+            <p className="text-[#4a5565]">123 Health Street, Medical City</p>
+            <p className="text-[#4a5565]">
               Phone: (123) 456-7890 | Email: info@medicare.com
             </p>
           </div>
-          <div style={{ textAlign: "right" }}>
-            <h2 style={{ fontSize: 20, fontWeight: "bold", color: "#1e40af" }}>
-              INVOICE
-            </h2>
-            <p style={{ color: "#4b5563" }}>Invoice #: {invoiceNumber}</p>
-            <p style={{ color: "#4b5563" }}>
+          <div className="text-right">
+            <h2 className="text-xl font-bold text-[#1447e6]">INVOICE</h2>
+            <p className="text-[#4a5565]">Invoice #{invoiceNumber}</p>
+            <p className="text-[#4a5565]">
               Date: {new Date(patientInfo.date).toLocaleDateString()}
             </p>
           </div>
         </div>
 
-        <div style={{ marginBottom: 32 }}>
-          <div
-            style={{
-              backgroundColor: "#eff6ff", // blue-50
-              padding: 16,
-              borderRadius: 8,
-            }}
-          >
-            <h3
-              style={{
-                fontSize: 16,
-                fontWeight: "600",
-                color: "#1e40af",
-                marginBottom: 8,
-              }}
-            >
+        <div className="mb-8">
+          <div className="bg-[#eff6ff] p-4 rounded-lg">
+            <h3 className="text-lg font-bold text-[#1447e6] mb-2">
               Patient Information
             </h3>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(2, 1fr)",
-                gap: 16,
-              }}
-            >
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <p style={{ fontSize: 12, color: "#4b5563" }}>Name</p>
-                <p style={{ fontWeight: "500" }}>{patientInfo.name}</p>
+                <p className="text-sm text-[#4a5565]">Name</p>
+                <p className="font-medium">{patientInfo.name}</p>
               </div>
               <div>
-                <p style={{ fontSize: 12, color: "#4b5563" }}>Age</p>
-                <p style={{ fontWeight: "500" }}>{patientInfo.age}</p>
+                <p className="text-sm text-[#4a5565]">Age</p>
+                <p className="font-medium">{patientInfo.age}</p>
               </div>
               <div>
-                <p style={{ fontSize: 12, color: "#4b5563" }}>Gender</p>
-                <p style={{ fontWeight: "500" }}>{patientInfo.gender}</p>
+                <p className="text-sm text-[#4a5565]">Gender</p>
+                <p className="font-medium">{patientInfo.gender}</p>
               </div>
               <div>
-                <p style={{ fontSize: 12, color: "#4b5563" }}>Contact</p>
-                <p style={{ fontWeight: "500" }}>{patientInfo.contact}</p>
-              </div>
-              <div>
-                <p style={{ fontSize: 12, color: "#4b5563" }}>Doctor</p>
-                <p style={{ fontWeight: "500" }}>{patientInfo.doctor}</p>
+                <p className="text-sm text-[#4a5565]">Contact</p>
+                <p className="font-medium">{patientInfo.contact}</p>
               </div>
             </div>
           </div>
         </div>
 
-        <div style={{ marginBottom: 24 }}>
-          <h3
-            style={{
-              fontSize: 16,
-              fontWeight: "600",
-              color: "#1e40af",
-              marginBottom: 8,
-            }}
-          >
-            Diagnosis
-          </h3>
-          <p style={{ color: "#374151" }}>
+        <div className="mb-6">
+          <h3 className="text-lg font-bold text-[#1447e6] mb-2">Diagnosis</h3>
+          <p className="text-[#4a5565]">
             {patientInfo.diagnosis || "Not specified"}
           </p>
         </div>
 
-        <div style={{ marginBottom: 32 }}>
-          <h3
-            style={{
-              fontSize: 16,
-              fontWeight: "600",
-              color: "#1e40af",
-              marginBottom: 8,
-            }}
-          >
+        <div className="mb-8">
+          <h3 className="text-lg font-bold text-[#1447e6] mb-2">
             Prescription Details
           </h3>
-          <div style={{ overflowX: "auto" }}>
-            <table
-              style={{
-                minWidth: "100%",
-                borderCollapse: "collapse",
-                borderSpacing: 0,
-                border: "1px solid #e5e7eb",
-              }}
-            >
-              <thead style={{ backgroundColor: "#f9fafb" }}>
+          <div className="overflow-x-auto">
+            <table className="min-w-full border border-[#e5e7eb]">
+              <thead className="bg-[#f3f4f6]">
                 <tr>
                   {[
                     "#",
@@ -210,15 +309,7 @@ const InvoiceGenerator = () => {
                   ].map((heading) => (
                     <th
                       key={heading}
-                      style={{
-                        padding: "12px 24px",
-                        textAlign: "left",
-                        fontSize: 12,
-                        fontWeight: "600",
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        borderBottom: "1px solid #e5e7eb",
-                      }}
+                      className="px-4 py-2 text-left text-xs font-bold text-[#4a5565] uppercase"
                     >
                       {heading}
                     </th>
@@ -227,29 +318,25 @@ const InvoiceGenerator = () => {
               </thead>
               <tbody>
                 {prescriptions.map((item, index) => (
-                  <tr key={item.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
-                    <td style={{ padding: "12px 24px", whiteSpace: "nowrap" }}>
-                      {index + 1}
-                    </td>
-                    <td style={{ padding: "12px 24px", whiteSpace: "nowrap" }}>
-                      {item.Test}
-                    </td>
-                    <td style={{ padding: "12px 24px", whiteSpace: "nowrap" }}>
+                  <tr key={item.id} className="border-b border-[#e5e7eb]">
+                    <td className="px-4 py-2 whitespace-nowrap">{index + 1}</td>
+                    <td className="px-4 py-2 whitespace-nowrap">{item.Test}</td>
+                    <td className="px-4 py-2 whitespace-nowrap">
                       {item.Doctor}
                     </td>
-                    <td style={{ padding: "12px 24px", whiteSpace: "nowrap" }}>
+                    <td className="px-4 py-2 whitespace-nowrap">
                       {item.duration}
                     </td>
-                    <td style={{ padding: "12px 24px", whiteSpace: "nowrap" }}>
+                    <td className="px-4 py-2 whitespace-nowrap">
                       {item.notes}
                     </td>
-                    <td style={{ padding: "12px 24px", whiteSpace: "nowrap" }}>
+                    <td className="px-4 py-2 whitespace-nowrap">
                       ₹{item.price || "0"}
                     </td>
-                    <td style={{ padding: "12px 24px", whiteSpace: "nowrap" }}>
+                    <td className="px-4 py-2 whitespace-nowrap">
                       {item.quantity || "0"}
                     </td>
-                    <td style={{ padding: "12px 24px", whiteSpace: "nowrap" }}>
+                    <td className="px-4 py-2 whitespace-nowrap">
                       ₹
                       {(parseFloat(item.price) || 0) *
                         (parseInt(item.quantity) || 0)}
@@ -261,130 +348,67 @@ const InvoiceGenerator = () => {
           </div>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-          }}
-        >
-          <div style={{ width: "100%", maxWidth: 400 }}>
-            <div
-              style={{
-                backgroundColor: "#f9fafb",
-                padding: 16,
-                borderRadius: 8,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "8px 0",
-                  borderBottom: "1px solid #e5e7eb",
-                  fontWeight: "500",
-                }}
-              >
-                <span>Subtotal:</span>
-                <span>₹{calculateSubtotal().toFixed(2)}</span>
+        <div className="flex justify-end">
+          <div className="w-full max-w-md">
+            <div className="bg-[#f3f4f6] p-4 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-bold text-[#4a5565]">
+                  Subtotal:
+                </span>
+                <span className="text-sm font-bold">
+                  ₹{calculateSubtotal().toFixed(2)}
+                </span>
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "8px 0",
-                  borderBottom: "1px solid #e5e7eb",
-                  fontWeight: "500",
-                }}
-              >
-                <span>Tax ({taxRate}%):</span>
-                <span>₹{calculateTax().toFixed(2)}</span>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-bold text-[#4a5565]">
+                  Tax ({taxRate}%):
+                </span>
+                <span className="text-sm font-bold">
+                  ₹{calculateTax().toFixed(2)}
+                </span>
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "8px 0",
-                  borderBottom: "1px solid #e5e7eb",
-                  fontWeight: "500",
-                }}
-              >
-                <span>Discount:</span>
-                <span>-₹{discount}</span>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-bold text-[#4a5565]">
+                  Discount:
+                </span>
+                <span className="text-sm font-bold">-₹{discount}</span>
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "8px 0",
-                  fontWeight: "700",
-                }}
-              >
-                <span>Total Amount:</span>
-                <span>₹{calculateTotal().toFixed(2)}</span>
+              <div className="flex items-center justify-between font-bold">
+                <span className="text-sm">Total Amount:</span>
+                <span className="text-sm">₹{calculateTotal()}</span>
               </div>
             </div>
           </div>
         </div>
 
-        <div
-          style={{
-            marginTop: 32,
-            paddingTop: 32,
-            borderTop: "1px solid #e5e7eb",
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 32,
-          }}
-        >
-          <div>
-            <h4
-              style={{
-                fontSize: 14,
-                fontWeight: "600",
-                color: "#4b5563",
-                marginBottom: 8,
-                textTransform: "capitalize",
-              }}
-            >
-              Payment Method
-            </h4>
-            <p style={{ textTransform: "capitalize" }}>{paymentMethod}</p>
-          </div>
-          <div>
-            <h4
-              style={{
-                fontSize: 14,
-                fontWeight: "600",
-                color: "#4b5563",
-                marginBottom: 8,
-              }}
-            >
-              Terms & Conditions
-            </h4>
-            <p style={{ fontSize: 10, color: "#6b7280" }}>
-              1. Payment is due within 15 days
-            </p>
-            <p style={{ fontSize: 10, color: "#6b7280" }}>
-              2. Please bring this invoice for any queries
-            </p>
-            <p style={{ fontSize: 10, color: "#6b7280" }}>
-              3. No returns or refunds on Tests
-            </p>
+        <div className="mt-8 pt-8 border-t border-[#e5e7eb]">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <h4 className="text-sm font-bold text-[#4a5565] mb-2">
+                Payment Method
+              </h4>
+              <p className="text-sm">{paymentMethod}</p>
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-[#4a5565] mb-2">
+                Terms & Conditions
+              </h4>
+              <p className="text-xs text-[#4a5565]">
+                1. Payment is due within 15 days
+              </p>
+              <p className="text-xs text-[#4a5565]">
+                2. Please bring this invoice for any queries
+              </p>
+              <p className="text-xs text-[#4a5565]">
+                3. No returns or refunds on Tests
+              </p>
+            </div>
           </div>
         </div>
 
-        <div
-          style={{
-            marginTop: 48,
-            paddingTop: 16,
-            borderTop: "1px solid #e5e7eb",
-            textAlign: "center",
-            color: "#6b7280",
-            fontSize: 12,
-          }}
-        >
+        <div className="mt-8 pt-8 border-t border-[#e5e7eb] text-center text-xs text-[#4a5565]">
           <p>Thank you for choosing Health Insurance</p>
-          <p style={{ color: "#9ca3af", marginTop: 8, fontSize: 10 }}>
+          <p className="mt-2">
             This is a computer generated invoice. No signature required.
           </p>
         </div>
@@ -392,79 +416,104 @@ const InvoiceGenerator = () => {
     );
   };
 
-
-  const handlePrint = async () => {
-    const element = invoiceRef.current;
-    if (!element) {
-      console.error('Invoice content not found.');
-      return;
-    }
-
-    try {
-      const canvas = await html2canvas(element, { scale: 2, useCORS: true });
-      const imgData = canvas.toDataURL('image/png');
-
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-
-      const imgWidth = pdfWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pdfHeight;
-
-      while (heightLeft > 0) {
-        position -= pdfHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pdfHeight;
-      }
-
-      pdf.save(`${invoiceNumber}.pdf`);
-    } catch (error) {
-      console.error('Failed to generate multi-page PDF:', error);
-    }
-  };
-
   return (
     <div className="flex gap-4">
       <Sidebar />
-      <div className="container mx-auto ">
-        <h1 className="text-2xl font-bold text-center mb-6 text-blue-800">Hospital Invoice Generator</h1>
+      <div className="container mx-auto">
+        <h1 className="text-2xl font-bold text-center mb-6 text-blue-800">
+          Hospital Invoice Generator
+        </h1>
+
+        {/* User Search Section */}
+        <div className="bg-white rounded-lg shadow-md p-4 mb-4">
+          <h2 className="text-lg font-semibold mb-3 text-[#1447e6]">
+            Find Patient
+          </h2>
+          <form onSubmit={searchUser} className="flex items-center">
+            <input
+              type="text"
+              value={searchUserId}
+              onChange={(e) => setSearchUserId(e.target.value)}
+              placeholder="Enter Patient Name or ID"
+              disabled={searchLoading}
+              className="flex-1 border border-gray-300 rounded-md py-2 px-3"
+            />
+            <button
+              type="submit"
+              disabled={searchLoading}
+              className="bg-[#1447e6] text-white py-2 px-4 rounded-md ml-2"
+            >
+              {searchLoading ? "Searching..." : "Search"}
+            </button>
+          </form>
+
+          {searchResults.length > 1 && (
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Select Patient:
+              </label>
+              <select
+                onChange={(e) =>
+                  handleSelectUser(
+                    searchResults.find((u) => u._id === e.target.value)
+                  )
+                }
+                className="w-full border border-gray-300 rounded-md py-2 px-3"
+              >
+                <option value="">-- Select --</option>
+                {searchResults.map((user) => (
+                  <option key={user._id} value={user._id}>
+                    {user.name} | Age: {user.age} | Phone: {user.phone}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {searchError && (
+            <div className="text-red-600 mt-2">{searchError}</div>
+          )}
+        </div>
+
+        {/* Patient Information Form */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6 no-print">
-          <h2 className="text-xl font-semibold mb-4 text-blue-700">Patient Information</h2>
+          <h2 className="text-xl font-semibold mb-4 text-[#1447e6]">
+            Patient Information
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Patient Name</label>
+              <label className="block text-sm font-medium text-gray-700">
+                Patient Name
+              </label>
               <input
                 type="text"
                 name="name"
                 value={patientInfo.name}
                 onChange={handlePatientInfoChange}
-                className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-[#eff6ff]0 focus:border-[#eff6ff]0"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Age</label>
+              <label className="block text-sm font-medium text-gray-700">
+                Age
+              </label>
               <input
                 type="number"
                 name="age"
                 value={patientInfo.age}
                 onChange={handlePatientInfoChange}
-                className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-[#eff6ff]0 focus:border-[#eff6ff]0"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Gender</label>
+              <label className="block text-sm font-medium text-gray-700">
+                Gender
+              </label>
               <select
                 name="gender"
                 value={patientInfo.gender}
                 onChange={handlePatientInfoChange}
-                className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-[#eff6ff]0 focus:border-[#eff6ff]0"
               >
                 <option value="male">Male</option>
                 <option value="female">Female</option>
@@ -472,84 +521,102 @@ const InvoiceGenerator = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Contact Number</label>
+              <label className="block text-sm font-medium text-gray-700">
+                Contact Number
+              </label>
               <input
                 type="text"
                 name="contact"
                 value={patientInfo.contact}
                 onChange={handlePatientInfoChange}
-                className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-[#eff6ff]0 focus:border-[#eff6ff]0"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Date</label>
+              <label className="block text-sm font-medium text-gray-700">
+                Date
+              </label>
               <input
                 type="date"
                 name="date"
                 value={patientInfo.date}
                 onChange={handlePatientInfoChange}
-                className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-[#eff6ff]0 focus:border-[#eff6ff]0"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Doctor</label>
+              <label className="block text-sm font-medium text-gray-700">
+                Wallet Balance
+              </label>
               <input
                 type="text"
-                name="doctor"
-                value={patientInfo.doctor}
-                onChange={handlePatientInfoChange}
-                className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                readOnly
+                value={user?.walletBalance}
+                className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-[#eff6ff]0 focus:border-[#eff6ff]0"
               />
             </div>
           </div>
+
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700">Diagnosis</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Diagnosis
+            </label>
             <textarea
               name="diagnosis"
               value={patientInfo.diagnosis}
               onChange={handlePatientInfoChange}
               rows="3"
-              className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className="resize-none mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-[#eff6ff]0 focus:border-[#eff6ff]0"
             />
           </div>
 
-          <h2 className="text-xl font-semibold mb-4 text-blue-700">Prescription & Billing</h2>
+          <h2 className="text-xl font-semibold mb-4 text-[#1447e6]">
+            Prescription & Billing
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Invoice Number</label>
+              <label className="block text-sm font-medium text-gray-700">
+                Invoice Number
+              </label>
               <input
                 type="text"
                 value={invoiceNumber}
                 onChange={(e) => setInvoiceNumber(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-[#eff6ff]0 focus:border-[#eff6ff]0"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700"> Rate (%)</label>
+              <label className="block text-sm font-medium text-gray-700">
+                Tax Rate (%)
+              </label>
               <input
                 type="number"
                 value={taxRate}
                 onChange={(e) => setTaxRate(Number(e.target.value))}
-                className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-[#eff6ff]0 focus:border-[#eff6ff]0"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Discount (₹)</label>
+              <label className="block text-sm font-medium text-gray-700">
+                Discount (₹)
+              </label>
               <input
                 type="number"
                 value={discount}
                 onChange={(e) => setDiscount(Number(e.target.value))}
-                className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-[#eff6ff]0 focus:border-[#eff6ff]0"
               />
             </div>
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700">Payment Method</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Payment Method
+            </label>
             <select
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value)}
-              className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-[#eff6ff]0 focus:border-[#eff6ff]0"
             >
               <option value="cash">Cash</option>
               <option value="card">Credit/Debit Card</option>
@@ -560,38 +627,70 @@ const InvoiceGenerator = () => {
           </div>
 
           <div className="overflow-x-auto mb-6">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="min-w-full divide-y divide-[#e5e7eb]">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Test</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doctor</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price (₹)</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Test
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Doctor
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Duration
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Notes
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Price (₹)
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Qty
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Action
+                  </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-[#e5e7eb]">
                 {prescriptions.map((item) => (
                   <tr key={item.id}>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <input
-                        type="text"
-                        name="Test"
-                        value={item.Test}
-                        onChange={(e) => handlePrescriptionChange(item.id, e)}
-                        className="border border-gray-300 rounded-md py-1 px-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500 w-full"
-                      />
+                      {loadingTests ? (
+                        <p>Loading tests...</p>
+                      ) : (
+                        <select
+                          value={item.testId}
+                          onChange={(e) =>
+                            handleTestChange(item.id, e.target.value)
+                          }
+                          className="border border-gray-300 rounded-md py-1 px-2 focus:outline-none focus:ring-[#eff6ff]0 focus:border-[#eff6ff]0 w-full"
+                        >
+                          <option value="">Select a Test</option>
+                          {tests?.map((test) => (
+                            <option key={test._id} value={test._id}>
+                              {test.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <input
-                        type="text"
-                        name="Doctor"
+                      <select
                         value={item.Doctor}
-                        onChange={(e) => handlePrescriptionChange(item.id, e)}
-                        className="border border-gray-300 rounded-md py-1 px-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500 w-full"
-                      />
+                        onChange={(e) =>
+                          handleDoctorChange(item.id, e.target.value)
+                        }
+                        className="border border-gray-300 rounded-md py-1 px-2 focus:outline-none focus:ring-[#eff6ff]0 focus:border-[#eff6ff]0 w-full"
+                      >
+                        <option value="">Select a Doctor</option>
+                        {doctors?.map((doctor) => (
+                          <option key={doctor._id} value={doctor.name}>
+                            {doctor.name}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <input
@@ -599,7 +698,7 @@ const InvoiceGenerator = () => {
                         name="duration"
                         value={item.duration}
                         onChange={(e) => handlePrescriptionChange(item.id, e)}
-                        className="border border-gray-300 rounded-md py-1 px-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500 w-full"
+                        className="border border-gray-300 rounded-md py-1 px-2 focus:outline-none focus:ring-[#eff6ff]0 focus:border-[#eff6ff]0 w-full"
                       />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -608,7 +707,7 @@ const InvoiceGenerator = () => {
                         name="notes"
                         value={item.notes}
                         onChange={(e) => handlePrescriptionChange(item.id, e)}
-                        className="border border-gray-300 rounded-md py-1 px-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500 w-full"
+                        className="border border-gray-300 rounded-md py-1 px-2 focus:outline-none focus:ring-[#eff6ff]0 focus:border-[#eff6ff]0 w-full"
                       />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -617,7 +716,7 @@ const InvoiceGenerator = () => {
                         name="price"
                         value={item.price || ""}
                         onChange={(e) => handlePrescriptionChange(item.id, e)}
-                        className="border border-gray-300 rounded-md py-1 px-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500 w-full"
+                        className="border border-gray-300 rounded-md py-1 px-2 focus:outline-none focus:ring-[#eff6ff]0 focus:border-[#eff6ff]0 w-full"
                       />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -626,7 +725,8 @@ const InvoiceGenerator = () => {
                         name="quantity"
                         value={item.quantity || ""}
                         onChange={(e) => handlePrescriptionChange(item.id, e)}
-                        className="border border-gray-300 rounded-md py-1 px-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500 w-full"
+                        className="border border-gray-300 rounded-md py-1 px-2 focus:outline-none focus:ring-[#eff6ff]0 focus:border-[#eff6ff]0 w-full"
+                        min="1"
                       />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -643,7 +743,7 @@ const InvoiceGenerator = () => {
             </table>
             <button
               onClick={addPrescription}
-              className="mt-2 bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              className="mt-2 bg-[#eff6ff]0 text-white py-2 px-4 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-[#eff6ff]0 focus:ring-offset-2"
             >
               Add Test
             </button>
@@ -653,21 +753,34 @@ const InvoiceGenerator = () => {
             <button
               onClick={() => {
                 setPatientInfo({
-                  name: '',
-                  age: '',
-                  gender: 'male',
-                  contact: '',
-                  address: '',
-                  date: new Date().toISOString().split('T')[0],
-                  doctor: '',
-                  diagnosis: ''
+                  name: "",
+                  age: "",
+                  gender: "male",
+                  contact: "",
+                  address: "",
+                  date: new Date().toISOString().split("T")[0],
+                  doctor: "",
+                  diagnosis: "",
                 });
-                setPrescriptions([{ id: uuidv4(), Test: '', Doctor: '', duration: '', notes: '' }]);
-                setInvoiceNumber(`INV-${Math.floor(1000 + Math.random() * 9000)}`);
+                setPrescriptions([
+                  {
+                    id: uuidv4(),
+                    testId: "",
+                    Test: "",
+                    Doctor: "",
+                    duration: "",
+                    notes: "",
+                    price: "",
+                    quantity: 1,
+                  },
+                ]);
+                setInvoiceNumber(
+                  `INV-${Math.floor(1000 + Math.random() * 9000)}`
+                );
                 setTaxRate(5);
                 setDiscount(0);
               }}
-              className="bg-gray-500 text-white py-2 px-6 rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+              className="bg-gray-500 text-white py-2 px-6 rounded-md hover:bg-[#4a5565] focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
             >
               Reset
             </button>
@@ -679,12 +792,13 @@ const InvoiceGenerator = () => {
             </button>
           </div>
         </div>
-        <PreviewForm />
+
+        <div className="print-container">
+          <PreviewForm />
+        </div>
       </div>
     </div>
   );
-
-
 };
 
 export default InvoiceGenerator;

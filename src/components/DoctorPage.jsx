@@ -8,7 +8,7 @@ import "react-responsive-modal/styles.css";
 import { FaUserDoctor } from "react-icons/fa6";
 
 
-const defaultImage = "https://cdn-icons-png.flaticon.com/128/8815/8815112.png";
+// const defaultImage = "https://cdn-icons-png.flaticon.com/128/8815/8815112.png";
 
 const DoctorPage = () => {
   const API_URL = "http://localhost:2100/api/doctors";
@@ -62,7 +62,6 @@ const DoctorPage = () => {
       const { data } = await axios.post(`${API_URL}/register`, form);
       toast.success(data.message);
       fetchDoctors();
-
       // Open modal for new doctor to update schedule
       openScheduleModal(data.doctor || {});
 
@@ -80,6 +79,7 @@ const DoctorPage = () => {
     } finally {
       setIsRegistering(false);
     }
+    window.location.reload();
   };
 
   const toggleAvailable = async (id) => {
@@ -98,8 +98,8 @@ const DoctorPage = () => {
 
     try {
       const { data } = await axios.delete(`${API_URL}/deleteDoctor/${id}`);
+      setDoctors(data.data);
       toast.success(data.message);
-      fetchDoctors();
     } catch (err) {
       console.error(err);
       toast.error("Delete failed");
@@ -145,7 +145,7 @@ const DoctorPage = () => {
     fetchDoctors();
   }, []);
 
-  const filteredDoctors = doctors.filter((doc) =>
+  const filteredDoctors = doctors?.filter((doc) =>
     `${doc.name} ${doc.specialty} ${doc.email}`
       .toLowerCase()
       .includes(searchTerm.toLowerCase())
@@ -292,7 +292,7 @@ const DoctorPage = () => {
             <div className="flex justify-center py-10">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
             </div>
-          ) : filteredDoctors.length === 0 ? (
+          ) : filteredDoctors?.length === 0 || !filteredDoctors ? (
             <div className="text-center py-10">
               <FaUserDoctor className="mx-auto text-gray-500 w-16 h-16 mb-4 border-2 p-2 rounded-full" />
               <h4 className="mt-4 text-lg font-medium text-gray-700">No doctors found</h4>
@@ -302,14 +302,14 @@ const DoctorPage = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredDoctors.map((doc) => (
+              {filteredDoctors?.map((doc) => (
                 <div
                   key={doc._id}
                   className="bg-white p-5 rounded-xl shadow border border-blue-500 hover:shadow-md transition duration-200 w-auto cursor-pointer"
                 >
                   <div className="flex items-start gap-4">
                     <img
-                      src={doc.profilePicture || defaultImage}
+                      src={doc.profilePicture}
                       className="w-16 h-16 rounded-full object-cover border-4 border-blue-100 shadow-sm"
                       alt="Doctor"
                     />
@@ -376,14 +376,6 @@ const DoctorPage = () => {
               <h3 className="text-xl font-bold text-gray-800">
                 {currentDoctor?.name ? `Update Schedule for ${currentDoctor.name}` : "Set Schedule"}
               </h3>
-              <button
-                onClick={closeModal}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
             </div>
 
             <div className="mb-5">

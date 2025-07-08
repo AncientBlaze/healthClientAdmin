@@ -11,7 +11,7 @@ function Plans() {
   const [filteredCustomers, setFilteredCustomers] = useState([]);
   const [open, setOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState({});
-  const [plan, setPlan] = useState("");
+  const [plan] = useState("");
   const [amount, setAmount] = useState("");
 
   useEffect(() => {
@@ -71,7 +71,7 @@ function Plans() {
       toast.success("Amount added successfully.");
       onCloseModal();
     } catch (error) {
-      toast.error("Failed to add amount.");
+      toast.error(`Failed to add amount. reason: ${error.message}`);
     }
   };
 
@@ -94,7 +94,7 @@ function Plans() {
       toast.success("Amount deducted successfully.");
       onCloseModal();
     } catch (error) {
-      toast.error("Failed to deduct amount.");
+      toast.error(`Failed to deduct amount. reason: ${error.message}`);
     }
   };
 
@@ -108,7 +108,7 @@ function Plans() {
       onCloseModal();
       window.location.reload();
     } catch (error) {
-      toast.error("Failed to update plan.");
+      toast.error(`Failed to update plan. reason: ${error.message}`);
     }
   };
 

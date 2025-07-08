@@ -18,10 +18,12 @@ import ErrorPage from "./components/ErrorPage.jsx";
 import Logs from "./components/Logs.jsx";
 import ScanRFID from "./components/ScanRFID.jsx";
 
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <Router>
     <Routes>
       <Route path="/" element={<LoginCustomer/>} />
+      <Route path="/loginCustomer" element={<LoginCustomer/>} />
       <Route path="/CustomerSignUp" element={<CustomerSignUp/>} />
       <Route path="/pro/:id" element={<ProfileCustomer/>} />
       <Route path="/forgotPassword" element={<ForgotPassword/>} />
