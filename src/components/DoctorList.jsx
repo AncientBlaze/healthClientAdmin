@@ -5,7 +5,7 @@ function DoctorList() {
   const [doctors, setDoctors] = useState([]);
 
   useEffect(() => {
-    axios.get('http://localhost:5000/api/doctors')
+    axios.get('http://82.180.144.250:5000/api/doctors')
       .then(res => setDoctors(res.data))
       .catch(err => console.error(err));
   }, []);

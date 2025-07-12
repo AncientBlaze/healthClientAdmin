@@ -20,6 +20,7 @@ function Register() {
       });
 
       toast.success(res.data.message);
+      console.log(res.data)
     } catch (error) {
       toast.error(error.response.data.message);
     }

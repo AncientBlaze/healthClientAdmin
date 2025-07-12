@@ -3,7 +3,7 @@ import axios from "axios";
 // Configuration constants (consider moving to environment variables)
 const CONFIG = {
   LOG_KEY: "http-logs",
-  BASE_URL:"http://localhost:2100",
+  BASE_URL:"http://82.180.144.250:2100",
   MAX_LOGS: 100,
   VALID_LOG_TYPES: ["request", "response", "error"],
   SENSITIVE_HEADERS: ["authorization", "x-api-key", "cookie", "set-cookie", "x-auth-token"],

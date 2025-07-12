@@ -143,10 +143,10 @@ function Plans() {
                     className="w-20 h-20 rounded-full object-cover mb-3"
                   />
                   <h2 className="text-lg font-semibold">{customer?.name}</h2>
-                  <p className="text-gray-600 text-sm">Phone: {customer?.phone}</p>
-                  <p className="text-gray-600 text-sm">Gender: {customer?.gender}</p>
-                  <p className="text-gray-600 text-sm">
-                    DOB: {customer?.dateOfBirth}
+                  <p className="text-black font-semibold text-sm">Phone: {customer?.phone}</p>
+                  <p className="text-black font-semibold text-sm">Gender: {customer?.gender}</p>
+                  <p className="text-black font-semibold text-sm">
+                    Balance: ₹{customer?.walletBalance}
                   </p>
                   <p className="text-blue-600 font-medium mt-1">
                     Plan: {customer?.plan}

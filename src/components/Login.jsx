@@ -10,35 +10,29 @@ function Login() {
   const navigate = useNavigate();
   const [eye, setEye] = useState(false);
 
+  const [userDetails, setUserDetails] = useState({
+    email: "",
+    password: ""
+  })
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const email = e.target.email.value;
-    const password = e.target.password.value;
-
-    if (!email || !password) {
-      return toast.error("Please fill in all fields");
-    }
 
     try {
-      const response = await axios.post(
-        "http://localhost:2100/api/admin/login",
-        {
-          email,
-          password,
-        }
-      );
-
-      if (response.data.status === 200) {
-        toast.success(response.data.message);
-        navigate("/dashboard");
+      const res = await axios.post('/api/admin/login', {
+        email: userDetails.email,
+        password: userDetails.password
+      });
+      console.log(res)
+      if (res.data.status == 200) {
+        navigate('/dashboard');
       } else {
-        toast.error(response.data.message);
+        toast.error(res.data.message)
       }
     } catch (error) {
-      console.error("Login error:", error);
-      toast.error("Login failed. Please try again.");
+      toast.error(error);
     }
-  };
+  }
 
   return (
     <>
@@ -68,6 +62,8 @@ function Login() {
               </label>
               <div className="flex items-center border rounded-lg p-3 bg-gray-100">
                 <input
+                  value={userDetails.email}
+                  onChange={(e) => setUserDetails({ ...userDetails, email: e.target.value })}
                   id="email"
                   type="email"
                   required
@@ -88,6 +84,8 @@ function Login() {
               <div className="flex items-center border rounded-lg p-3 bg-gray-100">
                 <input
                   id="password"
+                  value={userDetails.password}
+                  onChange={(e) => setUserDetails({ ...userDetails, password: e.target.value })}
                   type={eye ? "text" : "password"}
                   required
                   placeholder="Enter Password"

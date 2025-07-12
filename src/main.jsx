@@ -22,7 +22,7 @@ import ScanRFID from "./components/ScanRFID.jsx";
 ReactDOM.createRoot(document.getElementById("root")).render(
   <Router>
     <Routes>
-      <Route path="/" element={<LoginCustomer/>} />
+      <Route path="/" element={<Login/>} />
       <Route path="/loginCustomer" element={<LoginCustomer/>} />
       <Route path="/CustomerSignUp" element={<CustomerSignUp/>} />
       <Route path="/pro/:id" element={<ProfileCustomer/>} />

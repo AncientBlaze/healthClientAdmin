@@ -21,7 +21,7 @@ export default function Sidebar() {
     return (
         <aside className="h-auto min-w-64 bg-gradient-to-b from-blue-900 to-blue-700 text-white shadow-lg flex flex-col">
             <div className="h-20 border-b border-blue-800 flex items-center justify-center flex-col">
-                <p className="text-xl font-bold tracking-wide">HealthInsurance</p>
+                <p className="text-xl font-bold tracking-wide">HealthCare</p>
                 <div className="text-sm mt-1 inline-flex gap-3 items-center">Created by <img src={logo} className="w-28 h-8 object-cover" /></div>
             </div>
             <nav className="flex-1 py-6">

@@ -11,7 +11,7 @@ import { FaUserDoctor } from "react-icons/fa6";
 // const defaultImage = "https://cdn-icons-png.flaticon.com/128/8815/8815112.png";
 
 const DoctorPage = () => {
-  const API_URL = "http://localhost:2100/api/doctors";
+  const API_URL = "http://82.180.144.250:2100/api/doctors";
 
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(false);
