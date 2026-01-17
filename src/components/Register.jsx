@@ -12,7 +12,7 @@ function Register() {
     const name = AdminDetails.firstName + " " + AdminDetails.lastName;
     console.log(AdminDetails);
     try {
-      const res = await axios.post('/api/admin/signin', {
+      const res = await axios.post('/api/admin/signup', {
         name: name,
         email: AdminDetails.email,
         phone: AdminDetails.phone,
